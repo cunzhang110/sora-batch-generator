@@ -765,85 +765,6 @@ class SettingsDialog(QDialog):
             print(f"模型显示更新失败: {e}")
             pass
     
-        api_layout.addWidget(QLabel("API平台:"), 1, 0)
-        self.platform_combo = QComboBox()
-        self.platform_combo.addItems(["云雾", "apicore"])
-        api_layout.addWidget(self.platform_combo, 1, 1)
-        
-        api_layout.addWidget(QLabel("生图模型:"), 2, 0)
-        self.model_combo = QComboBox()
-        self.model_combo.addItems(["sora", "nano-banana"])
-        self.model_combo.currentTextChanged.connect(self.on_model_changed)
-        api_layout.addWidget(self.model_combo, 2, 1)
-        
-        # 测试连接按钮
-        self.test_api_button = QPushButton("测试API连接")
-        self.test_api_button.clicked.connect(self.test_api_connection)
-        api_layout.addWidget(self.test_api_button, 2, 2)
-        
-        layout.addWidget(api_group)
-        
-        # 生成参数区域
-        params_group = QGroupBox("⚡ 生成参数")
-        params_layout = QGridLayout(params_group)
-        
-        params_layout.addWidget(QLabel("并发线程数:"), 0, 0)
-        self.thread_spin = QSpinBox()
-        self.thread_spin.setRange(1, 2000)
-        self.thread_spin.setSuffix(" 个")
-        params_layout.addWidget(self.thread_spin, 0, 1)
-        
-        params_layout.addWidget(QLabel("失败重试次数:"), 0, 2)
-        self.retry_spin = QSpinBox()
-        self.retry_spin.setRange(0, 5)
-        self.retry_spin.setSuffix(" 次")
-        params_layout.addWidget(self.retry_spin, 0, 3)
-        
-        params_layout.addWidget(QLabel("图片比例:"), 1, 0)
-        self.ratio_combo = QComboBox()
-        self.ratio_combo.addItems(["3:2", "2:3"])
-        params_layout.addWidget(self.ratio_combo, 1, 1)
-        
-        layout.addWidget(params_group)
-        
-        # 保存路径区域
-        path_group = QGroupBox("📁 保存设置")
-        path_layout = QHBoxLayout(path_group)
-        
-        path_layout.addWidget(QLabel("保存路径:"))
-        self.path_input = QLineEdit()
-        self.path_input.setPlaceholderText("选择图片保存路径...")
-        path_layout.addWidget(self.path_input)
-        
-        self.path_button = QPushButton("浏览")
-        self.path_button.clicked.connect(self.select_save_path)
-        path_layout.addWidget(self.path_button)
-        
-        layout.addWidget(path_group)
-        
-        # 使用提示
-        tips_group = QGroupBox("💡 使用提示")
-        tips_layout = QVBoxLayout(tips_group)
-        
-        tips_text = QLabel("""
-<b>API配置提示:</b><br>
-• 请确保API密钥有效且有足够额度<br>
-• 不同平台的API调用限制可能不同<br><br>
-
-<b>性能优化建议:</b><br>
-• 线程数建议根据API平台限制设置（通常1-50个）<br>
-• 过多线程可能导致API限流<br>
-• 重试次数建议设置2-3次
-        """)
-        tips_text.setWordWrap(True)
-        tips_text.setStyleSheet("color: #666; background-color: #f8f9fa; padding: 15px; border-radius: 6px;")
-        tips_layout.addWidget(tips_text)
-        
-        layout.addWidget(tips_group)
-        layout.addStretch()
-        
-        self.tab_widget.addTab(config_widget, "⚙️ 基础配置")
-    
     def create_style_tab(self):
         """创建风格库管理标签页"""
         style_widget = QWidget()
@@ -2965,6 +2886,41 @@ class MainWindow(QMainWindow):
             # 默认返回旧的API密钥以保持兼容性
             return getattr(self, 'api_key', '')
     
+    def on_model_changed(self, model_name):
+        """模型选择改变时更新主界面显示"""
+        try:
+            # 只更新右上角API状态显示，移除左上角生图模型显示
+            if hasattr(self, 'api_status_label'):
+                api_key = self.get_current_api_key()
+                if api_key and api_key.strip():
+                    # 根据模型显示不同的emoji和颜色
+                    if model_name == "sora":
+                        model_emoji = "🌊"
+                        model_color = "#17a2b8"
+                    elif model_name == "nano-banana":
+                        model_emoji = "🍌" 
+                        model_color = "#fd7e14"
+                    else:
+                        model_emoji = "🤖"
+                        model_color = "#28a745"
+                    
+                    self.api_status_label.setText(f"{model_emoji} {model_name} 模型 | {self.api_platform} 平台")
+                    self.api_status_label.setStyleSheet(f"""
+                        QLabel {{
+                            color: #ffffff; 
+                            font-size: 14px; 
+                            font-weight: bold;
+                            padding: 8px 14px;
+                            background-color: {model_color};
+                            border: 2px solid rgba(255, 255, 255, 0.3);
+                            border-radius: 8px;
+                            margin-right: 10px;
+                        }}
+                    """)
+                
+        except Exception as e:
+            print(f"模型显示更新失败: {e}")
+    
     def delayed_initialization(self):
         """延迟初始化非关键组件"""
         # 检查并自动生成默认配置文件
@@ -3144,20 +3100,6 @@ class MainWindow(QMainWindow):
         title_label.setStyleSheet("font-size: 28px; font-weight: bold; color: #2c3e50; padding: 8px 0px;")
         title_layout.addWidget(title_label)
         
-        # 当前模型显示
-        self.current_model_label = QLabel("sora")  # 默认显示sora
-        self.current_model_label.setStyleSheet("""
-            QLabel {
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: bold;
-                background-color: #17a2b8;
-                border-radius: 8px;
-                padding: 6px 12px;
-                margin-left: 15px;
-            }
-        """)
-        title_layout.addWidget(self.current_model_label)
         
         title_layout.addStretch()
         left_section.addLayout(title_layout)
@@ -3947,28 +3889,39 @@ class MainWindow(QMainWindow):
                 save_status = "已设置" if self.save_path else "未设置"
                 self.quick_status_label.setText(f"API平台: {self.api_platform} | 线程: {self.thread_count} | 保存路径: {save_status}")
             
-            # 更新当前模型显示
-            if hasattr(self, 'current_model_label'):
-                self.on_model_changed(self.image_model)
+            # 更新生图模型显示
+            self.on_model_changed(self.image_model)
             
             # 更新API状态显示
             if hasattr(self, 'api_status_label'):
                 api_key = self.get_current_api_key()
                 if api_key and api_key.strip():
-                    self.api_status_label.setText(f"API: 已配置 ({self.api_platform})")
-                    self.api_status_label.setStyleSheet("""
-                        QLabel {
-                            color: #28a745; 
+                    # 根据模型显示不同的emoji和颜色
+                    if self.image_model == "sora":
+                        model_emoji = "🌊"
+                        model_color = "#17a2b8"
+                    elif self.image_model == "nano-banana":
+                        model_emoji = "🍌" 
+                        model_color = "#fd7e14"
+                    else:
+                        model_emoji = "🤖"
+                        model_color = "#28a745"
+                    
+                    self.api_status_label.setText(f"{model_emoji} {self.image_model} 模型 | {self.api_platform} 平台")
+                    self.api_status_label.setStyleSheet(f"""
+                        QLabel {{
+                            color: #ffffff; 
                             font-size: 14px; 
+                            font-weight: bold;
                             padding: 8px 14px;
-                            background-color: #d4edda;
-                            border: 1px solid #c3e6cb;
-                            border-radius: 6px;
+                            background-color: {model_color};
+                            border: 2px solid rgba(255, 255, 255, 0.3);
+                            border-radius: 8px;
                             margin-right: 10px;
-                        }
+                        }}
                     """)
                 else:
-                    self.api_status_label.setText("API: 未配置")
+                    self.api_status_label.setText("❌ API未配置")
                     self.api_status_label.setStyleSheet("""
                         QLabel {
                             color: #dc3545; 

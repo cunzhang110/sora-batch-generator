@@ -3,7 +3,7 @@
   "api_platform": "云雾",
   "image_model": "sora",
   "sora_api_key": "sk-2SrbT51SKosw0kaj9QaUFb2wcTU2S2HpYNm1rNtD2LoY1scg",
-  "nano_api_key": "",
+  "nano_api_key": "sk-2SrbT51SKosw0kaj9QaUFb2wcTU2S2HpYNm1rNtD2LoY1scg",
   "thread_count": 5,
   "retry_count": 3,
   "save_path": "Z:/共享资料/youtube/ai生图/基础素材/图片挑选",
@@ -42,7 +42,7 @@
       "content": "真人写实风格，真实世界，细节",
       "category": "自定义风格",
       "created_time": "2025-08-22 13:48:43",
-      "usage_count": 10
+      "usage_count": 11
     },
     "3D动画奶萌风格": {
       "name": "3D动画奶萌风格",
@@ -57,8 +57,8 @@
   "window_geometry": {
     "width": 1716,
     "height": 1746,
-    "x": 489,
-    "y": 167
+    "x": 599,
+    "y": 149
   },
   "category_links": {
     "kpop": [
