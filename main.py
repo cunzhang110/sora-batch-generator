@@ -386,7 +386,7 @@ class Worker(QRunnable):
             if self.image_model == "sora":
                 # Sora模型配置
                 if self.api_platform == "云雾":
-                    model = "sora_image"
+                    model = "sora"  # 修正：云雾平台使用 sora 而不是 sora_image
                 elif self.api_platform == "apicore":
                     model = "sora"
                 else:
@@ -396,9 +396,9 @@ class Worker(QRunnable):
                 if self.api_platform == "云雾":
                     model = "fal-ai/nano-banana"
                 elif self.api_platform == "apicore":
-                    model = "nano-banana"
+                    model = "fal-ai/nano-banana"  # 修正：统一使用 fal-ai/nano-banana
                 else:
-                    model = "nano-banana"
+                    model = "fal-ai/nano-banana"
             else:
                 # 默认使用sora
                 model = "sora"
@@ -408,13 +408,15 @@ class Worker(QRunnable):
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that generates images based on text descriptions."
+                        "content": "You are an AI image generator. Generate high-quality images based on user text descriptions. Always provide the generated image URL in the response."
                     },
                     {
                         "role": "user",
                         "content": content
                     }
-                ]
+                ],
+                "max_tokens": 1000,  # 添加max_tokens限制
+                "temperature": 0.7   # 添加适中的创造性
             }
             
             # 记录请求信息
@@ -436,7 +438,7 @@ class Worker(QRunnable):
                         api_url, 
                         headers=headers, 
                         json=payload,
-                        timeout=600
+                        timeout=300  # 减少超时时间到5分钟，避免长时间挂起
                     )
                     
                     # 记录响应信息
@@ -450,15 +452,27 @@ class Worker(QRunnable):
                     # 平台返回文本中的图片URL
                     content = data["choices"][0]["message"]["content"]
                     
-                    # 尝试多种格式的图片URL
+                    # 尝试多种格式的图片URL，按优先级排序
+                    image_url_match = None
+                    
+                    # 优先级1: 点击下载链接
                     image_url_match = re.search(r'\[点击下载\]\((.*?)\)', content)
+                    
+                    # 优先级2: 图片markdown格式
                     if not image_url_match:
                         image_url_match = re.search(r'!\[图片\]\((.*?)\)', content)
+                    
+                    # 优先级3: 任何markdown图片格式
                     if not image_url_match:
-                        image_url_match = re.search(r'!\[.*?\]\((https?://.*?)\)', content)
+                        image_url_match = re.search(r'!\[.*?\]\((https?://[^\)]+)\)', content)
+                    
+                    # 优先级4: 直接查找图片URL（常见格式）
                     if not image_url_match:
-                        # 直接查找URL
-                        image_url_match = re.search(r'(https?://[^\s\)]+\.(?:jpg|jpeg|png|gif|webp))', content, re.IGNORECASE)
+                        image_url_match = re.search(r'(https?://[^\s\)\]]+\.(?:jpg|jpeg|png|gif|webp|bmp))', content, re.IGNORECASE)
+                    
+                    # 优先级5: 查找任何以http开头的链接（可能是图片）
+                    if not image_url_match:
+                        image_url_match = re.search(r'(https?://[^\s\)\]]+)', content)
                     
                     if image_url_match:
                         image_url = image_url_match.group(1)
@@ -481,10 +495,13 @@ class Worker(QRunnable):
                     if retry_times <= self.retry_count:
                         logging.warning(f"请求失败,正在进行第{retry_times}次重试: {error_detail}")
                         self.signals.progress.emit(self.prompt, f"重试中 ({retry_times}/{self.retry_count})...")
-                        # 递增式重试延迟：第1次重试等待10秒，第2次等待20秒，第3次等待30秒
-                        retry_delay = 10 * retry_times
+                        # 递增式重试延迟：第1次重试等待30秒，第2次等待60秒，第3次等待90秒
+                        retry_delay = 30 * retry_times
                         logging.info(f"重试延迟 {retry_delay} 秒...")
-                        time.sleep(retry_delay)
+                        # 显示倒计时，让用户知道等待进度
+                        for remaining in range(retry_delay, 0, -5):
+                            self.signals.progress.emit(self.prompt, f"重试中 ({retry_times}/{self.retry_count}) - {remaining}秒后重试...")
+                            time.sleep(5)
                         continue
                     else:
                         error_msg = f"请求失败(已重试{self.retry_count}次): {error_detail}"
