@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.pytest_cache/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+crash_log.txt
+
+# 临时文件
+*.tmp
+*.temp
+
+# 生成的图片（可选，如果不想备份生成的图片）
+# *.png
+# *.jpg
+# *.jpeg
