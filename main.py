@@ -333,6 +333,13 @@ class Worker(QRunnable):
             # 验证API密钥
             if not self.api_key:
                 raise ValueError("API密钥不能为空")
+            
+            # 验证API密钥格式
+            if not self.api_key.startswith('sk-'):
+                logging.warning(f"API密钥格式可能不正确，应以'sk-'开头: {self.api_key[:10]}...")
+            
+            # 记录使用的配置（用于调试）
+            logging.info(f"使用配置 - 平台: {self.api_platform}, 模型: {self.image_model}, 密钥前缀: {self.api_key[:10]}...")
                 
             # 构建API请求
             if self.api_platform == "云雾":
@@ -490,7 +497,17 @@ class Worker(QRunnable):
                     error_detail = f"API平台: {self.api_platform}, 模型: {model}, 错误: {str(e)}"
                     
                     if hasattr(e, 'response') and e.response is not None:
-                        error_detail += f", 状态码: {e.response.status_code}, 响应: {e.response.text[:500]}"
+                        status_code = e.response.status_code
+                        response_text = e.response.text[:500]
+                        error_detail += f", 状态码: {status_code}, 响应: {response_text}"
+                        
+                        # 针对401错误提供具体建议
+                        if status_code == 401:
+                            error_detail += f"\n💡 解决建议: API密钥无效，请检查："
+                            error_detail += f"\n  1. 确认API密钥是否正确复制"
+                            error_detail += f"\n  2. 检查{self.api_platform}平台密钥是否过期"
+                            error_detail += f"\n  3. 验证密钥是否支持{model}模型"
+                            error_detail += f"\n  4. 当前使用密钥: {self.api_key[:15]}..."
                     
                     if retry_times <= self.retry_count:
                         logging.warning(f"请求失败,正在进行第{retry_times}次重试: {error_detail}")
@@ -1268,13 +1285,29 @@ class SettingsDialog(QDialog):
     
     def test_api_connection(self):
         """测试API连接"""
-        api_key = self.api_input.text().strip()
         platform = self.platform_combo.currentText()
         image_model = self.model_combo.currentText()  # 获取选择的生图模型
         
-        if not api_key:
-            QMessageBox.warning(self, "错误", "请先输入API密钥")
-            return
+        # 根据模型选择对应的API密钥
+        if image_model == "sora":
+            api_key = self.sora_api_input.text().strip()
+            if not api_key:
+                QMessageBox.warning(self, "错误", "请先输入Sora模型的API密钥")
+                return
+        elif image_model == "nano-banana":
+            api_key = self.nano_api_input.text().strip()
+            if not api_key:
+                QMessageBox.warning(self, "错误", "请先输入Nano-banana模型的API密钥")
+                return
+        else:
+            # 兼容旧版本，使用通用API密钥
+            if hasattr(self, 'api_input'):
+                api_key = self.api_input.text().strip()
+            else:
+                api_key = self.sora_api_input.text().strip()  # 默认使用sora密钥
+            if not api_key:
+                QMessageBox.warning(self, "错误", "请先输入API密钥")
+                return
             
         # 禁用按钮，显示测试中
         self.test_api_button.setEnabled(False)
@@ -1293,7 +1326,7 @@ class SettingsDialog(QDialog):
             # 根据选择的模型设置API参数（与Worker类保持一致）
             if image_model == "sora":
                 if platform == "云雾":
-                    model = "sora_image"
+                    model = "sora"  # 修正：使用正确的模型名称
                 elif platform == "apicore":
                     model = "sora"
                 else:
@@ -1302,9 +1335,9 @@ class SettingsDialog(QDialog):
                 if platform == "云雾":
                     model = "fal-ai/nano-banana"
                 elif platform == "apicore":
-                    model = "nano-banana"
+                    model = "fal-ai/nano-banana"  # 修正：统一使用fal-ai/nano-banana
                 else:
-                    model = "nano-banana"
+                    model = "fal-ai/nano-banana"
             else:
                 model = "sora"  # 默认
             
