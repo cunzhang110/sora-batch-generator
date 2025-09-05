@@ -501,19 +501,29 @@ class Worker(QRunnable):
                         response_text = e.response.text[:500]
                         error_detail += f", 状态码: {status_code}, 响应: {response_text}"
                         
-                        # 针对401错误提供具体建议
+                        # 针对不同错误码提供具体建议
                         if status_code == 401:
                             error_detail += f"\n💡 解决建议: API密钥无效，请检查："
                             error_detail += f"\n  1. 确认API密钥是否正确复制"
                             error_detail += f"\n  2. 检查{self.api_platform}平台密钥是否过期"
                             error_detail += f"\n  3. 验证密钥是否支持{model}模型"
                             error_detail += f"\n  4. 当前使用密钥: {self.api_key[:15]}..."
+                        elif status_code == 503:
+                            error_detail += f"\n💡 解决建议: 服务暂不可用，请考虑："
+                            error_detail += f"\n  1. 切换到apicore平台试试"
+                            error_detail += f"\n  2. 使用nano-banana模型替代"
+                            error_detail += f"\n  3. 稍后重试，服务可能正在维护"
+                            error_detail += f"\n  4. {self.api_platform}平台的{model}模型可能暂时无可用通道"
                     
                     if retry_times <= self.retry_count:
                         logging.warning(f"请求失败,正在进行第{retry_times}次重试: {error_detail}")
                         self.signals.progress.emit(self.prompt, f"重试中 ({retry_times}/{self.retry_count})...")
-                        # 递增式重试延迟：第1次重试等待30秒，第2次等待60秒，第3次等待90秒
-                        retry_delay = 30 * retry_times
+                        # 递增式重试延迟：第1次重试等待60秒，第2次等待120秒，第3次等待180秒
+                        # 针对503错误延长等待时间，给服务器更多恢复时间
+                        if hasattr(e, 'response') and e.response is not None and e.response.status_code == 503:
+                            retry_delay = 90 * retry_times  # 503错误等待更长时间
+                        else:
+                            retry_delay = 60 * retry_times  # 其他错误也延长到60秒倍数
                         logging.info(f"重试延迟 {retry_delay} 秒...")
                         # 显示倒计时，让用户知道等待进度
                         for remaining in range(retry_delay, 0, -5):
@@ -521,7 +531,15 @@ class Worker(QRunnable):
                             time.sleep(5)
                         continue
                     else:
-                        error_msg = f"请求失败(已重试{self.retry_count}次): {error_detail}"
+                        # 重试失败，提供最终建议
+                        final_suggestion = ""
+                        if hasattr(e, 'response') and e.response is not None and e.response.status_code == 503:
+                            final_suggestion = f"\n\n🔄 建议立即尝试："
+                            final_suggestion += f"\n• 切换到apicore平台"
+                            final_suggestion += f"\n• 或使用nano-banana模型"
+                            final_suggestion += f"\n• 云雾平台sora模型可能正在维护中"
+                        
+                        error_msg = f"请求失败(已重试{self.retry_count}次): {error_detail}{final_suggestion}"
                         logging.error(error_msg)
                         self.signals.error.emit(self.prompt, error_msg)
                         return
